@@ -1,3 +1,8 @@
 #phaser-wrapper canvas {
   display: block;
 }
+
+@font-face {
+  font-family: 'minecraftia';
+  src: url('src/assets/fonts/minecraftia.ttf') format('ttf');
+}
