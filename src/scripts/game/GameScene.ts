@@ -132,7 +132,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   spawnFruit() {
-    let score = 3000
+    let score = 0
     if (score>1500) {
       score = 1500;
     }
