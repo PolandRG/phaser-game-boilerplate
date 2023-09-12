@@ -1,14 +1,17 @@
 import { ActionAddScore, ActionTakeLife, GameDispatch, GameState } from './GameContext';
 import Align from './systems/Align';
 import SoundSystem from './systems/SoundSystem';
+import Fruit from './systems/spawnFruit';
+import Player from './systems/spawnPlayer';
 
 export default class GameScene extends Phaser.Scene {
   private _sounds!: SoundSystem;
-  player!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;
   cursors: Phaser.Types.Input.Keyboard.CursorKeys | undefined;
-  fruit: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | undefined;
-  gameWidth!: number; gameHeight!: number;
   deadline!: Phaser.GameObjects.Rectangle;
+  private _player!: Player;
+  _fruit!: Fruit; _fruits!: Phaser.Physics.Arcade.Group;
+  _data!: { dispatch: GameDispatch; state: GameState; };
+
 
   preload() {
     Align.init(this);
@@ -36,28 +39,11 @@ export default class GameScene extends Phaser.Scene {
     // data.dispatch(new ActionTakeLife());
     //}, 1500);
 
-    // player & movements
-
+    // player movements
     this.cursors = this.input.keyboard?.createCursorKeys();
-    this.player! = this.physics.add.sprite(0, 750, 'GameAtlas').setScale(1.5);
-    this.player!.setBounce(0.1);
-    this.player!.setCollideWorldBounds(true);
-    this.player!.body.setGravityY(600)
 
-    // invisible line - collision with fruit
-
-    this.gameWidth = this.sys.game.canvas.width;
-    this.gameHeight = this.sys.game.canvas.height;
-    this.deadline = this.add.rectangle(0, this.gameHeight-1, this.gameWidth*2, 2, 0x6666ff);
-    this.physics.add.existing(this.deadline);
-    
-    // initialize sounds
-
-    this._sounds = new SoundSystem(this.game, 'sounds');
-
-    this.scale.on(Phaser.Scale.Events.RESIZE, this.resize, this);
-    this.resize();
-    // add animations to player
+    // player & animations
+    this._player = this.physics.add.existing(new Player(this, 100, 750, 'knight/knight iso char_idle_0.png'));
 
     this.anims.create({
       key: 'player_idle',
@@ -100,8 +86,23 @@ export default class GameScene extends Phaser.Scene {
 
     // set default animation
 
-    this.player!.play('player_idle');
+    this._player.play('player_idle');
+
+    // invisible line - collision with fruit
+
+    this.deadline = this.add.rectangle(0, Align.height-1, Align.width*2, 2, 0x6666ff).setAlpha(0);
+    this.physics.add.existing(this.deadline);
     
+    // initialize sounds
+
+    this._sounds = new SoundSystem(this.game, 'sounds');
+    this._data = data;
+
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.resize, this);
+    this.resize();
+
+    this._fruits = this.physics.add.group();
+
     // spawn first fruit
     this.spawnFruit();
     // this.gameOver('Game Over.');
@@ -112,81 +113,82 @@ export default class GameScene extends Phaser.Scene {
   update() {
     // set movement direction
     if(this.cursors?.right.isDown) {
-      this.player!.play('player_move_right', true);
-      this.player.setVelocityX(330);
+      this._player.moveRight();
     }
     else if(this.cursors?.left.isDown) {
-      this.player!.play('player_move_left', true);
-      this.player.setVelocityX(-330);
+      this._player.moveLeft();
     }
     else {
-      this.player!.play('player_idle', true);
-      this.player.setVelocityX(0);
+      this._player.idle();
     }
+    //this._fruits.angle(+0.5)
+    this.deadline.y = Align.height-1;
+  }
+
+  // spawn fruits
+
+  updateGameState() {
+    this._sounds.play('collect');      
   }
 
   spawnFruit() {
-    setTimeout(() => {
-    // spawn fruit
+    let score = 3000
+    if (score>1500) {
+      score = 1500;
+    }
+    var fruitSpawnX = Phaser.Math.FloatBetween(0, Align.width);
+    var randomValue = Phaser.Math.FloatBetween(0, 100);
+    if(fruitSpawnX<Align.width*0.025) {fruitSpawnX=fruitSpawnX+randomValue};
+    if(Align.width*0.975<fruitSpawnX) {fruitSpawnX=fruitSpawnX-randomValue};
+    const fruit = this.physics.add.existing(new Fruit(this, fruitSpawnX));
 
-    var fruitSpawnX = Phaser.Math.FloatBetween(0, this.gameWidth);
-    const fruitTable = ['Apple', 'Avocado', 'Bread', 'Brownie', 'Cheese', 'Cookie', 'MelonHoneydew', 'MelonWater', 'Peach', 'PieLemon', 'Lemon', 'Onion'];
-    const fruitName = Math.floor(Math.random() * fruitTable.length);
+    this._fruits.add(fruit);
+    
+    this.physics.add.collider(this.deadline, fruit, () =>{
+      this.hitGround(this.deadline, fruit)
+      this._sounds.play('fail');
+    }, function(){}, {element: this.deadline, fruit: fruit});
 
-    this.fruit = this.physics.add.sprite(fruitSpawnX,50,'GameAtlas', 'fruits/'+fruitTable[fruitName]+'.png').setScale(2).setGravityY(20).setCollideWorldBounds(true);
+    this.physics.add.collider(this._player, fruit, () =>{
+      this.hitPlayer(this._player, fruit)
+      this._sounds.play('collect');
+    }, function(){}, {element: this.deadline, fruit: fruit});
 
-    // colliders
+    fruit.setGravityY(20);
 
-    this.physics.add.collider(this.player, this.fruit, this.hitPlayer, function(){}, {element: this.player, fruit: this.fruit});
-    this.physics.add.collider(this.deadline, this.fruit, this.hitGround, function(){}, {element: this.deadline, fruit: this.fruit});
-    }, 10);
-
-    // spawn again
-
+    this._sounds.play('btn');
     setTimeout(() => {
       this.spawnFruit();
-    }, 3000);
+    },3000-score)
   }
 
-  // score & life functions 
-
-  addScore(data: {dispatch: GameDispatch, state: GameState}, score: number){
-    if (data && score) {
-      data.dispatch(new ActionAddScore(score));
-    }
-  }
-
-  takeLife(data: {dispatch: GameDispatch, state: GameState}){
-    if (data) {
-      data.dispatch(new ActionTakeLife());
-    }
-  }
-  
   // features that remove objects that have collided with the player or the ground
 
   hitPlayer(element: any, fruit: any) {
     if (element && fruit) {
+      this._data.dispatch(new ActionAddScore(1));
       fruit.setActive(false).setVisible(false);
       fruit.destroy();
-
       // add score
     }
   }
   
   hitGround(element: any, fruit: any) {
       if (element && fruit) {
-        console.log('failed.');
-        fruit.setActive(false).setVisible(false);
-        fruit.destroy();
-
-        // take life
+        fruit.setTint(0x666666);
+        fruit.disableBody().setActive(false);
+        setTimeout(()=> {
+          this._data.dispatch(new ActionTakeLife);
+          fruit.setVisible(false);
+          fruit.destroy();
+        }, 2000)
       }
   }
 
   // the function is called after taking 3 lifes
   
   gameOver(text: string) {
-      let gameOverText = this.add.text(this.gameWidth*0.5, this.gameHeight*0.5, text.toString(), {fontFamily: 'minecraftia', fontSize: 32, color: 'black'});
+      let gameOverText = this.add.text(Align.width*0.5, Align.height*0.5, text.toString(), {fontFamily: 'minecraftia', fontSize: 32, color: 'black'});
       setTimeout(() => {
         if (gameOverText) {
         this.game.pause();
@@ -199,3 +201,4 @@ export default class GameScene extends Phaser.Scene {
   }
 
 }
+
