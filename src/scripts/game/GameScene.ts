@@ -133,8 +133,8 @@ export default class GameScene extends Phaser.Scene {
 
   spawnFruit() {
     let score = 0
-    if (score>1500) {
-      score = 1500;
+    if (score>2000) {
+      score = 2000;
     }
     var fruitSpawnX = Phaser.Math.FloatBetween(0, Align.width);
     var randomValue = Phaser.Math.FloatBetween(0, 100);
