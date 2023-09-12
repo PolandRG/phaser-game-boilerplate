@@ -12,7 +12,6 @@ export default class GameScene extends Phaser.Scene {
   _fruit!: Fruit; _fruits!: Phaser.Physics.Arcade.Group;
   _data!: { dispatch: GameDispatch; state: GameState; };
 
-
   preload() {
     Align.init(this);
 
@@ -127,15 +126,12 @@ export default class GameScene extends Phaser.Scene {
 
   // spawn fruits
 
-  updateGameState() {
-    this._sounds.play('collect');      
-  }
-
   spawnFruit() {
-    let score = 0
-    if (score>2000) {
-      score = 2000;
-    }
+    //let score = this._data.state.score;
+    //console.log('score: '+score);
+    //if (score>2000) {
+    //  score = 2000;
+    //}
     var fruitSpawnX = Phaser.Math.FloatBetween(0, Align.width);
     var randomValue = Phaser.Math.FloatBetween(0, 100);
     if(fruitSpawnX<Align.width*0.025) {fruitSpawnX=fruitSpawnX+randomValue};
@@ -159,7 +155,7 @@ export default class GameScene extends Phaser.Scene {
     this._sounds.play('btn');
     setTimeout(() => {
       this.spawnFruit();
-    },3000-score)
+    },3000)
   }
 
   // features that remove objects that have collided with the player or the ground
